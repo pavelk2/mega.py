@@ -444,7 +444,38 @@ class Mega(object):
         file_id = path[0]
         file_key = path[1]
         self._download_file(file_id, file_key, dest_path, dest_filename, is_public=True)
+    
+    def get_direct_link(self, file, dest_path=None, dest_filename=None):
+        """
+        Get direct link
+        """
+        return self._get_direct_link(None, None, file=file[1], dest_path=dest_path, dest_filename=dest_filename, is_public=False)
+    def _get_direct_link(self, file_handle, file_key, dest_path=None, dest_filename=None, is_public=False, file=None):
+        if file is None:
+            if is_public:
+                file_key = base64_to_a32(file_key)
+                file_data = self._api_request({'a': 'g', 'g': 1, 'p': file_handle})
+            else:
+                file_data = self._api_request({'a': 'g', 'g': 1, 'n': file_handle})
 
+            k = (file_key[0] ^ file_key[4], file_key[1] ^ file_key[5],
+                 file_key[2] ^ file_key[6], file_key[3] ^ file_key[7])
+            iv = file_key[4:6] + (0, 0)
+            meta_mac = file_key[6:8]
+        else:
+            file_data = self._api_request({'a': 'g', 'g': 1, 'n': file['h']})
+            k = file['k']
+            iv = file['iv']
+            meta_mac = file['meta_mac']
+
+        # Seems to happens sometime... When  this occurs, files are 
+        # inaccessible also in the official also in the official web app.
+        # Strangely, files can come back later.
+        if 'g' not in file_data:
+            raise RequestError('File not accessible anymore')
+        file_url = file_data['g']
+        return file_url
+        
     def _download_file(self, file_handle, file_key, dest_path=None, dest_filename=None, is_public=False, file=None):
         if file is None:
             if is_public:
